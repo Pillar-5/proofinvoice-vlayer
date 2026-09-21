@@ -29,9 +29,6 @@ const CURRENCY_MINOR_UNITS: Record<string, number> = {
   USD: 2, EUR: 2, GBP: 2, CHF: 2, JPY: 0, KRW: 0, BHD: 3, KWD: 3, TND: 3,
 };
 
-const HEADER_BLOCK_RE =
-  /(?:^|\r?\n)-----BEGIN PROOFINVOICE CLAIM-----\r?\n([\s\S]*?)\r?\n-----END PROOFINVOICE CLAIM-----/i;
-
 function headerValue(block: string, name: string): string | null {
   const re = new RegExp(`(?:^|\\r?\\n)${name}:[ \\t]*([^\\r\\n]+)`, "i");
   const match = re.exec(block);
@@ -76,37 +73,31 @@ export function parseDueDateDays(date: string): bigint | null {
 }
 
 /**
- * Parses a full RFC 822 source string. Tolerates transport noise; a *missing*
- * claim field is a diagnostic, not a thrown error — proving is what decides.
+ * Parses a full RFC 822 source string, mirroring the prover exactly: the
+ * `Invoice-ID:` / `Amount:` / `Currency:` / `Due-Date:` header fields are
+ * matched anywhere in the message (the Solidity regexes are not anchored to a
+ * block), and the issuer domain comes from the `From` header. A *missing*
+ * field is a diagnostic, not a thrown error — proving is what decides.
  */
 export function parseInvoiceEmail(mimeSource: string): ParsedEmail {
   const diagnostics: string[] = [];
-
-  const blockMatch = HEADER_BLOCK_RE.exec(mimeSource);
-  if (!blockMatch) {
-    return { claim: null, diagnostics: ["no ProofInvoice/1 claim block found"], headerBlock: null };
-  }
-  const block = blockMatch[1];
-  if (block === undefined) {
-    return { claim: null, diagnostics: ["malformed claim block"], headerBlock: null };
-  }
 
   const fromHeader = /(?:^|\r?\n)From:[ \t]*([^\r\n]+)/i.exec(mimeSource);
   const domain = fromHeader ? senderDomain(fromHeader[1] ?? "") : null;
   if (!domain) diagnostics.push("From header missing or not a bare mailbox@domain");
 
-  const invoiceId = headerValue(block, "Invoice-ID");
+  const invoiceId = headerValue(mimeSource, "Invoice-ID");
   if (!invoiceId) diagnostics.push("Invoice-ID missing");
-  const amountStr = headerValue(block, "Amount");
+  const amountStr = headerValue(mimeSource, "Amount");
   if (!amountStr) diagnostics.push("Amount missing");
-  const currencyRaw = headerValue(block, "Currency");
+  const currencyRaw = headerValue(mimeSource, "Currency");
   const currency = currencyRaw ? currencyRaw.toUpperCase() : null;
   if (!currency) diagnostics.push("Currency missing");
-  const dueDate = headerValue(block, "Due-Date");
+  const dueDate = headerValue(mimeSource, "Due-Date");
   if (!dueDate) diagnostics.push("Due-Date missing");
 
   if (diagnostics.length > 0) {
-    return { claim: null, diagnostics, headerBlock: block };
+    return { claim: null, diagnostics, headerBlock: null };
   }
 
   const amountMinor = parseAmountMinor(amountStr as string, currency as string);
@@ -114,7 +105,7 @@ export function parseInvoiceEmail(mimeSource: string): ParsedEmail {
     return {
       claim: null,
       diagnostics: ["Amount/currency not representable in minor units"],
-      headerBlock: block,
+      headerBlock: null,
     };
   }
   const dueDateDays = parseDueDateDays(dueDate as string);
@@ -122,7 +113,7 @@ export function parseInvoiceEmail(mimeSource: string): ParsedEmail {
     return {
       claim: null,
       diagnostics: ["Due-Date is not a valid YYYY-MM-DD date"],
-      headerBlock: block,
+      headerBlock: null,
     };
   }
 
@@ -135,7 +126,7 @@ export function parseInvoiceEmail(mimeSource: string): ParsedEmail {
       dueDateDays,
     },
     diagnostics,
-    headerBlock: block,
+    headerBlock: null,
   };
 }
 

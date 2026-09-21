@@ -41,7 +41,10 @@ describe("parseInvoiceEmail", () => {
     const email = "From: a@b.co\nSubject: hi\n\nno block here\n";
     const parsed = parseInvoiceEmail(email);
     expect(parsed.claim).toBeNull();
-    expect(parsed.diagnostics).toContain("no ProofInvoice/1 claim block found");
+    expect(parsed.diagnostics).toContain("Invoice-ID missing");
+    expect(parsed.diagnostics).toContain("Amount missing");
+    expect(parsed.diagnostics).toContain("Currency missing");
+    expect(parsed.diagnostics).toContain("Due-Date missing");
   });
 
   it("reports each missing field as a separate diagnostic", () => {

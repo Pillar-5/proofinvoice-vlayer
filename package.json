@@ -20,7 +20,8 @@
     "test": "vitest run --exclude 'tests/integration/**'",
     "test:watch": "vitest --exclude 'tests/integration/**'",
     "test:integration": "vitest run tests/integration",
-    "metrics:export": "node scripts/export-metrics.mjs"
+    "metrics:export": "node scripts/export-metrics.mjs",
+    "screenshot": "node scripts/screenshot.mjs"
   },
   "dependencies": {
     "@vlayer/sdk": "1.5.1",
@@ -33,6 +34,7 @@
   "devDependencies": {
     "@types/express": "5.0.0",
     "@types/node": "22.10.5",
+    "puppeteer-core": "^23.11.1",
     "tsx": "4.19.2",
     "typescript": "5.6.3",
     "vitest": "2.1.8"

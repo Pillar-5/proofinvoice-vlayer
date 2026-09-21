@@ -133,9 +133,15 @@ struct InvoiceClaim {
 }
 ```
 
-The prover extracts fields from the authenticated body using vlayer's regex precompile:
-`Invoice-ID:`, `Amount:`, `Currency:`, `Due-Date:` inside a `ProofInvoice/1` claim block, plus the
-domain from the authenticated `From` header.
+The prover extracts fields from the authenticated body using vlayer's regex precompile — the
+`Invoice-ID:`, `Amount:`, `Currency:`, `Due-Date:` header-style fields (matched anywhere in the
+message body; fixtures may wrap them in optional `BEGIN/END PROOFINVOICE CLAIM` markers), plus the
+domain from the authenticated `From` header. The TypeScript parser is a deliberate mirror of these
+exact regexes, so what you see in the UI is what the zkEVM prover will prove.
+
+Sample demo output and a UI screenshot: see [`docs/demo-output.md`](docs/demo-output.md) and
+[`docs/screenshot-demo.png`](docs/screenshot-demo.png) (regenerate with `npm run screenshot` while
+the server is running).
 
 ## Contracts
 

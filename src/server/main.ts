@@ -229,6 +229,20 @@ export function createApp(config: AppConfig): Express {
     res.json(metrics.snapshot());
   });
 
+  // Non-secret runtime configuration, for the UI's Verify/Result sections.
+  app.get("/api/config", (_req: Request, res: Response) => {
+    res.json({
+      mode: config.mode,
+      network: process.env.CHAIN_NAME ?? "anvil",
+      chainId: config.vlayer.chainId,
+      vlayerUrl: config.vlayer.url || null,
+      dnsResolverUrl: config.vlayer.dnsResolverUrl,
+      proverAddress: process.env.PROVER_ADDRESS ?? null,
+      verifierAddress: config.chain.verifierAddress,
+      registryAddress: config.chain.registryAddress,
+    });
+  });
+
   // --- static frontend ------------------------------------------------------
 
   app.use(express.static(join(repoRoot, "frontend")));

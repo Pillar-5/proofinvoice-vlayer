@@ -11,7 +11,7 @@ async function loadFixtures() {
     opt.value = f.name; opt.textContent = f.name;
     sel.appendChild(opt);
   }
-  if (fixtures.length > 0) sel.dispatchEvent(new Event("change"));
+  return fixtures;
 }
 $("fixture").addEventListener("change", async () => {
   const res = await fetch(`/api/fixtures/${$("fixture").value}`);
@@ -100,27 +100,52 @@ $("verify").addEventListener("click", async () => {
   }
 });
 
-function renderResult(session) {
-  const p = session.proof?.proof ?? {};
-  const rows = [
-    ["Invoice ID hash", p.invoiceIdHash],
-    ["Issuer domain hash", p.issuerDomainHash],
-    ["Amount (minor units)", p.amountMinor],
-    ["Currency", p.currency],
-    ["Verification timestamp", new Date(Number(session.settlement?.verifiedAt ?? 0) * 1000).toISOString()],
-    ["Transaction", session.settlement?.txHash],
-    ["Claim hash", session.settlement?.claimHash],
-    ["Block", session.settlement?.blockNumber],
-  ];
-  $("result").querySelector("tbody").innerHTML =
-    rows.map(([k, v]) => `<tr><th>${k}</th><td><code>${v ?? "—"}</code></td></tr>`).join("");
-}
-
+let chainConfig = null;
 async function refreshMetrics() {
   const metrics = await (await fetch("/api/metrics")).json();
   $("metricsOut").textContent = JSON.stringify(metrics, null, 2);
 }
 $("refreshMetrics").addEventListener("click", refreshMetrics);
 
-loadFixtures();
+async function loadConfig() {
+  chainConfig = await (await fetch("/api/config")).json();
+  $("chainInfo").textContent =
+    `Network: ${chainConfig.network} (chainId ${chainConfig.chainId}) · mode: ${chainConfig.mode}` +
+    ` · Verifier: ${chainConfig.verifierAddress ?? "not deployed"} · Registry: ${chainConfig.registryAddress ?? "not deployed"}`;
+}
+
+function renderResult(session) {
+  const p = session.proof?.proof ?? {};
+  const rows = [
+    ["Invoice ID", state.claim?.invoiceId],
+    ["Issuer domain", state.claim?.issuerDomain],
+    ["Amount", state.claim ? `${Number(state.claim.amountMinor) / 100} ${state.claim.currency}` : p.amountMinor],
+    ["Verification timestamp", new Date(Number(session.settlement?.verifiedAt ?? 0) * 1000).toISOString()],
+    ["Transaction", session.settlement?.txHash],
+    ["Claim hash", session.settlement?.claimHash],
+    ["Contract (Registry)", chainConfig?.registryAddress],
+    ["Contract (Verifier)", chainConfig?.verifierAddress],
+    ["Block", session.settlement?.blockNumber],
+  ];
+  $("result").querySelector("tbody").innerHTML =
+    rows.map(([k, v]) => `<tr><th>${k}</th><td><code>${v ?? "—"}</code></td></tr>`).join("");
+}
+
+loadConfig();
+(async () => {
+  // Auto-load and parse the first fixture so the demo page is immediately
+  // meaningful (and screenshots are deterministic).
+  try {
+    const fixtures = await loadFixtures();
+    const names = fixtures.map((f) => f.name);
+    const name = names.includes("invoice-sample.eml") ? "invoice-sample.eml" : names[0];
+    if (name) {
+      $("fixture").value = name;
+      $("eml").value = await (await fetch(`/api/fixtures/${name}`)).text();
+      $("parse").click();
+    }
+  } catch (err) {
+    console.error("auto-load failed", err instanceof Error ? err.stack : String(err));
+  }
+})();
 refreshMetrics();

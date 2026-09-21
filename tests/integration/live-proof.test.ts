@@ -9,7 +9,7 @@
  *   1. the vlayer local devnet running (call_server on :3000 and vdns_server
  *      on :3002), or a hosted prover plus VLAYER_API_TOKEN;
  *   2. deployed contracts (Prover, Verifier, Registry) on the settlement chain;
- *   3. PROOFINVOICE_MODE=live with VLAYER_URL, VERIFIER_ADDRESS,
+ *   3. PROOFINVOICE_MODE=live with PROVER_URL, VERIFIER_ADDRESS,
  *      REGISTRY_ADDRESS and a funded PRIVATE_KEY.
  *
  * Run with: npm run test:integration
@@ -22,12 +22,13 @@ import { resolve, dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const here = dirname(fileURLToPath(import.meta.url));
-const fixturePath = resolve(here, "..", "fixtures", "invoice-sample.eml");
+// tests/integration/ -> repo root -> fixtures/
+const fixturePath = resolve(here, "..", "..", "fixtures", "invoice-sample.eml");
 
 const env = process.env;
 const prerequisites =
   (env.PROOFINVOICE_MODE ?? "").toLowerCase() === "live" &&
-  !!env.VLAYER_URL &&
+  !!env.PROVER_URL &&
   !!env.VERIFIER_ADDRESS &&
   !!env.REGISTRY_ADDRESS &&
   !!env.PRIVATE_KEY;
@@ -72,8 +73,8 @@ describe.skipIf(!prerequisites)("live vlayer Email Proof end-to-end", () => {
 
     // The registry must now report the claim as verified.
     const { createPublicClient, http } = await import("viem");
-    const { invoiceRegistryAbi } = await import("../src/vlayer/abi.js");
-    const { createChain, resolveChainName } = await import("../src/vlayer/chains.js");
+    const { invoiceRegistryAbi } = await import("../../src/vlayer/abi.js");
+    const { createChain, resolveChainName } = await import("../../src/vlayer/chains.js");
     const publicClient = createPublicClient({
       chain: createChain(resolveChainName(env.CHAIN_NAME ?? "anvil")),
       transport: http(env.JSON_RPC_URL),

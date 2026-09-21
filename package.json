@@ -17,9 +17,9 @@
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "dev": "tsx src/server/main.ts",
     "start": "node dist/server/main.js",
-    "test": "vitest run --exclude 'tests/integration/**'",
-    "test:watch": "vitest --exclude 'tests/integration/**'",
-    "test:integration": "vitest run tests/integration",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:integration": "vitest run --config vitest.integration.config.ts",
     "metrics:export": "node scripts/export-metrics.mjs",
     "screenshot": "node scripts/screenshot.mjs"
   },

@@ -114,7 +114,7 @@ at implementation time):
 | Prover pattern | `ProofInvoiceProver is Prover`, `main(UnverifiedEmail)` returns `Proof` + claim fields; private input stays private |
 | Verifier pattern | `InvoiceVerifier is Verifier`, `onlyVerified(prover, ProofInvoiceProver.main.selector)` re-derives the journal from the submitted arguments |
 | Devnet | docker compose `vdns_server` (:3002) + `call_server` (:3000), anvil at 31337 |
-| Env vars | `VLAYER_URL`, `DNS_SERVICE_URL`, `VLAYER_API_TOKEN`, `CHAIN_NAME`, `JSON_RPC_URL` |
+| Env vars | `PROVER_URL`, `DNS_SERVICE_URL`, `VLAYER_API_TOKEN`, `VLAYER_ENV`, `CHAIN_NAME`, `JSON_RPC_URL` (the official names from `@vlayer/sdk/config`) |
 | Compiler | solc **0.8.28** (vlayer 1.5.1 pin), Foundry |
 
 Record of packages/versions: `@vlayer/sdk@1.5.1`, vlayer Solidity `v1.5.1`, forge-std `1.9.4`,
@@ -194,11 +194,11 @@ cp .env.example .env
 | Variable | Meaning |
 |---|---|
 | `PROOFINVOICE_MODE` | `demo` (default): parser/UI/metrics only; proof endpoints fail with HTTP 409 instead of faking. `live`: real proving + settlement. |
-| `VLAYER_URL` | vlayer prover API (devnet `call_server`: `http://127.0.0.1:3000`) |
+| `PROVER_URL` | vlayer prover API (devnet `call_server`: `http://127.0.0.1:3000`) |
 | `DNS_SERVICE_URL` | DKIM DNS resolver (devnet `vdns_server`: `http://127.0.0.1:3002`, hosted: `https://test-dns.vlayer.xyz`) |
 | `VLAYER_API_TOKEN` | only for hosted proving |
-| `CHAIN_NAME` | `anvil` (devnet) or sepolia / base-sepolia / optimism-sepolia / arbitrum-sepolia |
-| `CHAIN_ID` | chain id sent with the proving request (devnet: 31337) |
+| `VLAYER_ENV` | `dev` / `testnet` / `mainnet` (official vlayer environment selector) |
+| `CHAIN_NAME` | `anvil` (devnet) or sepolia / base-sepolia / optimism-sepolia / arbitrum-sepolia. Single source of truth — the chain id sent with the proving request is derived from it, so RPC and prover can never disagree |
 | `JSON_RPC_URL` | settlement RPC |
 | `PROVER_ADDRESS` / `VERIFIER_ADDRESS` / `REGISTRY_ADDRESS` | deployed contracts |
 | `PRIVATE_KEY` | settlement tx signer (anvil default key for devnet) |

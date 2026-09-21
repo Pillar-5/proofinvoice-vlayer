@@ -50,7 +50,7 @@ UI preview and the zkEVM prover agree by construction.
 ```json
 {"error":"Server is in demo mode (PROOFINVOICE_MODE=demo): real proof
 generation and on-chain settlement are disabled. Set PROOFINVOICE_MODE=live
-with VLAYER_URL and deployed contract addresses to enable them."}
+with PROVER_URL and deployed contract addresses to enable them."}
 ```
 
 This is deliberate: ProofInvoice fails loudly rather than silently substituting

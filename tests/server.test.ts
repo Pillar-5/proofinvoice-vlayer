@@ -43,9 +43,9 @@ const post = async (path: string, body: unknown) => {
 describe("config", () => {
   it("defaults to demo mode and fails loudly when live is under-configured", () => {
     expect(loadConfig({}).mode).toBe("demo");
-    expect(() => loadConfig({ PROOFINVOICE_MODE: "live" } as NodeJS.ProcessEnv)).toThrow(/VLAYER_URL/);
+    expect(() => loadConfig({ PROOFINVOICE_MODE: "live" } as NodeJS.ProcessEnv)).toThrow(/PROVER_URL/);
     expect(() =>
-      loadConfig({ PROOFINVOICE_MODE: "live", VLAYER_URL: "http://x" } as NodeJS.ProcessEnv),
+      loadConfig({ PROOFINVOICE_MODE: "live", PROVER_URL: "http://x" } as NodeJS.ProcessEnv),
     ).toThrow(/VERIFIER_ADDRESS/);
   });
 

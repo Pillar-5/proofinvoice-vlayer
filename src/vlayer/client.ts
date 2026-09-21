@@ -18,7 +18,7 @@ import { proofInvoiceProverAbi } from "./abi.js";
  */
 
 export interface VlayerConfig {
-  /** vlayer prover service URL (VLAYER_URL). */
+  /** vlayer prover service URL (`PROVER_URL`). */
   proverUrl: string;
   /** DNS-over-HTTPS resolver used for DKIM record lookups (DNS_SERVICE_URL). */
   dnsResolverUrl: string;

@@ -15,11 +15,15 @@ no_match_path = "test/vlayer/*"
 
 # vlayer-specific Foundry profile. `vlayer test` runs `test/vlayer/*` with the
 # vlayer zkEVM cheatcodes (callProver/getProof/preverifyEmail) enabled.
+#
+# NOTE: Foundry merges profiles, so the default profile's exclusion of
+# `test/vlayer/*` would otherwise survive into this profile and `vlayer test`
+# would report "No tests to run". Overriding with a dummy pattern that matches
+# nothing is used instead of an empty string, whose "clear the parent value"
+# semantics are not reliable across Foundry versions.
 [profile.vlayer]
 match-path = "test/vlayer/*"
-
-[profile.no-vlayer]
-no-match-path = "test/vlayer/*"
+no_match_path = "test/ZZZ-never-matches-anything/*"
 
 [rpc_endpoints]
 anvil = "http://127.0.0.1:8545"
@@ -38,7 +42,7 @@ arbitrum-sepolia = "https://sepolia-rollup.arbitrum.io/rpc"
 #   uninitialized-local      -> Solidity zero-initialises these locals; the linter flags
 #                               accumulator declarations it cannot prove are assigned first.
 #   divide-before-multiply   -> required by Howard Hinnant's days_from_civil integer algorithm.
-[lint]
+[profile.lint]
 exclude_lints = [
     "unsafe-typecast",
     "require-revert-in-loop",

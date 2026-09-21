@@ -43,7 +43,7 @@ export function createApp(config: AppConfig): Express {
       throw Object.assign(
         new Error(
           "Server is in demo mode (PROOFINVOICE_MODE=demo): real proof generation and on-chain settlement are disabled. " +
-            "Set PROOFINVOICE_MODE=live with VLAYER_URL and deployed contract addresses to enable them.",
+            "Set PROOFINVOICE_MODE=live with PROVER_URL and deployed contract addresses to enable them.",
         ),
         { status: 409 },
       );
@@ -107,9 +107,13 @@ export function createApp(config: AppConfig): Express {
     }
 
     const mime = typeof req.body?.mimeEmail === "string" ? req.body.mimeEmail : null;
-    const proverAddress = req.body?.proverAddress as `0x${string}` | undefined;
+    // An explicitly supplied prover address wins (it lets one deployment serve
+    // several prover instances); otherwise the validated `PROVER_ADDRESS` is used.
+    const proverAddress = (req.body?.proverAddress as `0x${string}` | undefined) ?? config.chain.proverAddress ?? undefined;
     if (!mime || !proverAddress) {
-      res.status(400).json({ error: "body must be { mimeEmail: string, proverAddress: address }" });
+      res.status(400).json({
+        error: "body must be { mimeEmail: string, proverAddress: address } (or set PROVER_ADDRESS in .env)",
+      });
       return;
     }
 
@@ -197,7 +201,7 @@ export function createApp(config: AppConfig): Express {
 
       session.state = "settling";
       const chainConfig: ChainConfig = {
-        viemChain: createChain(resolveChainName(process.env.CHAIN_NAME ?? "anvil")),
+        viemChain: createChain(config.vlayer.chainName),
         rpcUrl: config.chain.rpcUrl,
         verifierAddress: config.chain.verifierAddress,
         registryAddress: config.chain.registryAddress,
@@ -230,14 +234,16 @@ export function createApp(config: AppConfig): Express {
   });
 
   // Non-secret runtime configuration, for the UI's Verify/Result sections.
+  // Every value comes from the validated config so the UI can never display a
+  // network/address that differs from the one the server actually settles on.
   app.get("/api/config", (_req: Request, res: Response) => {
     res.json({
       mode: config.mode,
-      network: process.env.CHAIN_NAME ?? "anvil",
+      network: config.vlayer.chainName,
       chainId: config.vlayer.chainId,
-      vlayerUrl: config.vlayer.url || null,
+      proverUrl: config.vlayer.url || null,
       dnsResolverUrl: config.vlayer.dnsResolverUrl,
-      proverAddress: process.env.PROVER_ADDRESS ?? null,
+      proverAddress: config.chain.proverAddress,
       verifierAddress: config.chain.verifierAddress,
       registryAddress: config.chain.registryAddress,
     });

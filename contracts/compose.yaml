@@ -1,0 +1,25 @@
+# vlayer local devnet used by the live demo and integration test.
+# Service layout follows the official vlayer examples:
+#   - call_server  : vlayer prover API (zkEVM host)          -> http://127.0.0.1:3000
+#   - vdns_server  : DNS resolver + notary for DKIM records  -> http://127.0.0.1:3002
+# Anvil itself runs on the host (anvil --port 8545) so the settlement chain
+# shares the host network.
+#
+# NOTE: pin image tags to the version matching your @vlayer/sdk before any
+# serious use — `docker compose pull && docker image ls` then edit the tags.
+services:
+  call_server:
+    image: ghcr.io/vlayer-xyz/call_server:latest
+    ports:
+      - "3000:3000"
+    environment:
+      # devnet (fake) proof mode — produces real zk proofs against a fake
+      # settlement environment as documented for vlayer local development
+      RUST_LOG: info
+
+  vdns_server:
+    image: ghcr.io/vlayer-xyz/vdns_server:latest
+    ports:
+      - "3002:3002"
+    environment:
+      RUST_LOG: info

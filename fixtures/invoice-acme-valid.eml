@@ -1,0 +1,31 @@
+MIME-Version: 1.0
+From: Acme Billing <billing@acme-supplies.example>
+To: procurement@buyer-org.example
+Subject: Invoice INV-2026-0001 - February consulting
+Date: Mon, 02 Feb 2026 09:15:00 +0000
+Message-ID: <inv-2026-0001@acme-supplies.example>
+Content-Type: text/plain; charset="UTF-8"
+
+Dear procurement team,
+
+Please find the details of our February consulting invoice below.
+
+ProofInvoice/1
+Invoice-ID: INV-2026-0001
+Amount: 12500.00
+Currency: EUR
+Due-Date: 2026-03-04
+
+Payment details:
+Bank: Example Bank SEPA
+IBAN: NL00EXAMPLE0000000000
+
+Kind regards,
+Acme Billing
+billing@acme-supplies.example
+
+--
+This is a ProofInvoice demo fixture. It is NOT DKIM-signed: it exists to
+exercise the local parsing/claim pipeline deterministically. Generating a
+real vlayer Email Proof requires an email whose DKIM signature can be
+verified against live DNS - see README "Generating a real proof".

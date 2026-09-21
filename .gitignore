@@ -1,0 +1,30 @@
+# Dependencies
+node_modules/
+.cache/
+
+# Secrets and local configuration — NEVER commit .env
+.env
+.env.*
+!.env.example
+
+# Build artifacts
+dist/
+coverage/
+*.tsbuildinfo
+
+# Foundry
+contracts/out/
+contracts/cache/
+contracts/broadcast/
+contracts/lib/
+contracts/.cache/
+contracts/sdk/
+
+# Demo runtime state
+data/
+*.log
+proofs/
+
+# OS / editor
+.DS_Store
+Thumbs.db

@@ -1,0 +1,23 @@
+MIME-Version: 1.0
+From: Acme Billing <billing@acme-supplies.example>
+To: procurement@buyer-org.example
+Subject: Invoice INV-2026-0002 (malformed fixture)
+Date: Mon, 02 Feb 2026 09:20:00 +0000
+Message-ID: <inv-2026-0002@acme-supplies.example>
+Content-Type: text/plain; charset="UTF-8"
+
+Dear procurement team,
+
+ProofInvoice/1
+Invoice-ID: INV-2026-0002
+Amount: 12,500.00
+Currency: AUD
+Due-Date: not-a-date
+
+Kind regards,
+Acme Billing
+
+--
+Malformed on purpose: thousands separator in Amount, unsupported currency
+(AUD), unparsable Due-Date. Used by the application tests to assert that
+the claim pipeline fails loudly instead of emitting a garbage claim.

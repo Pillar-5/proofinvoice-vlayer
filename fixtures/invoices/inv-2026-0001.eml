@@ -1,0 +1,25 @@
+Message-ID: <INV-2026-0001.0042@billing.example.com>
+Date: Mon, 2 Mar 2026 09:15:00 +0000
+From: Billing <billing@billing.example.com>
+To: accounts-payable@acme-corp.test
+Subject: Invoice INV-2026-0001 from Example Fabrication Ltd
+MIME-Version: 1.0
+Content-Type: text/plain; charset=utf-8
+Content-Transfer-Encoding: 7bit
+
+Dear Accounts Payable,
+
+Please find the details for our latest invoice below.
+
+Invoice-ID: INV-2026-0001
+Amount: 1250.00
+Currency: EUR
+Due-Date: 2026-04-01
+
+Payment terms: 30 days net.
+Reference: Example Fabrication Ltd, Contract ACME-SUP-2024-17.
+
+Regards,
+Billing Department
+Example Fabrication Ltd
+billing@billing.example.com

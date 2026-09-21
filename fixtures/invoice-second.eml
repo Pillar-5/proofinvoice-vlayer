@@ -1,0 +1,22 @@
+Message-ID: <INV-2026-0002@billing.example.com>
+Date: Wed, 21 Jan 2026 10:00:00 +0000
+From: billing@second-supplier.org
+To: accounts@example-buyer.com
+Subject: Invoice INV-2026-0002
+MIME-Version: 1.0
+Content-Type: text/plain; charset=utf-8
+
+Hello,
+
+Second sample invoice for the ProofInvoice demo.
+
+-----BEGIN PROOFINVOICE CLAIM-----
+Invoice-ID: INV-2026-0002
+Amount: 875.50
+Currency: USD
+Due-Date: 2026-03-08
+-----END PROOFINVOICE CLAIM-----
+
+Regards,
+Billing
+second-supplier.org

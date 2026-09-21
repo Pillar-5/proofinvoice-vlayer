@@ -1,0 +1,47 @@
+[profile.default]
+src = "src"
+out = "out"
+test = "test"
+script = "script"
+libs = ["lib"]
+# vlayer 1.5.1 pins solc 0.8.28 (see contracts/vlayer foundry.toml in vlayer-xyz/vlayer)
+solc_version = "0.8.28"
+evm_version = "cancun"
+optimizer = true
+optimizer_runs = 200
+fs_permissions = [{ access = "read", path = "./testdata" }]
+# `test/vlayer/*` needs the vlayer zkEVM cheatcodes and only runs under `vlayer test`.
+no_match_path = "test/vlayer/*"
+
+# vlayer-specific Foundry profile. `vlayer test` runs `test/vlayer/*` with the
+# vlayer zkEVM cheatcodes (callProver/getProof/preverifyEmail) enabled.
+[profile.vlayer]
+match-path = "test/vlayer/*"
+
+[profile.no-vlayer]
+no-match-path = "test/vlayer/*"
+
+[rpc_endpoints]
+anvil = "http://127.0.0.1:8545"
+sepolia = "https://eth-sepolia.public.blastapi.io"
+base-sepolia = "https://sepolia.base.org"
+optimism-sepolia = "https://sepolia.optimism.io"
+arbitrum-sepolia = "https://sepolia-rollup.arbitrum.io/rpc"
+
+# Foundry's linter is intentionally tuned rather than silenced globally. The
+# excluded lints below all fire on deliberate, reviewed code:
+#
+#   unsafe-typecast          -> `bytes3("EUR")` is a literal-to-literal conversion that
+#                               Solidity rejects unless the literal is exactly 3 bytes, and
+#                               the uint64 casts are bounded by explicit range checks.
+#   require-revert-in-loop   -> fail-fast validation over bounded ASCII strings (< 25 chars).
+#   uninitialized-local      -> Solidity zero-initialises these locals; the linter flags
+#                               accumulator declarations it cannot prove are assigned first.
+#   divide-before-multiply   -> required by Howard Hinnant's days_from_civil integer algorithm.
+[lint]
+exclude_lints = [
+    "unsafe-typecast",
+    "require-revert-in-loop",
+    "uninitialized-local",
+    "divide-before-multiply",
+]

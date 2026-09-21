@@ -1,0 +1,40 @@
+{
+  "name": "proofinvoice-vlayer",
+  "version": "0.1.0",
+  "private": true,
+  "description": "ProofInvoice: verifiable business invoice claims from authenticated email using vlayer Email Proofs",
+  "license": "MIT",
+  "type": "module",
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "contracts:install": "node scripts/fetch-vlayer-contracts.mjs",
+    "contracts:build": "forge --root contracts build",
+    "contracts:test": "forge --root contracts test",
+    "contracts:fmt": "forge --root contracts fmt --check",
+    "build": "tsc -p tsconfig.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "dev": "tsx src/server/main.ts",
+    "start": "node dist/server/main.js",
+    "test": "vitest run --exclude 'tests/integration/**'",
+    "test:watch": "vitest --exclude 'tests/integration/**'",
+    "test:integration": "vitest run tests/integration",
+    "metrics:export": "node scripts/export-metrics.mjs"
+  },
+  "dependencies": {
+    "@vlayer/sdk": "1.5.1",
+    "dotenv": "16.4.5",
+    "express": "4.21.2",
+    "postal-mime": "2.3.2",
+    "viem": "2.27.0",
+    "zod": "3.24.1"
+  },
+  "devDependencies": {
+    "@types/express": "5.0.0",
+    "@types/node": "22.10.5",
+    "tsx": "4.19.2",
+    "typescript": "5.6.3",
+    "vitest": "2.1.8"
+  }
+}

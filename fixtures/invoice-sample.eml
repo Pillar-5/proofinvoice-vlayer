@@ -1,0 +1,24 @@
+Message-ID: <INV-2026-0001@billing.example.com>
+Date: Tue, 20 Jan 2026 10:00:00 +0000
+From: billing@example-supplier.com
+To: accounts@example-buyer.com
+Subject: Invoice INV-2026-0001
+MIME-Version: 1.0
+Content-Type: text/plain; charset=utf-8
+
+Dear accounts team,
+
+Please find the details for this month's engagement below.
+
+-----BEGIN PROOFINVOICE CLAIM-----
+Invoice-ID: INV-2026-0001
+Amount: 1250.00
+Currency: EUR
+Due-Date: 2026-02-19
+-----END PROOFINVOICE CLAIM-----
+
+Payment by bank transfer within 30 days.
+
+Kind regards,
+Accounts Receivable
+example-supplier.com

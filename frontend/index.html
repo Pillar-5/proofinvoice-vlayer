@@ -1,0 +1,77 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>ProofInvoice — Verifiable Business Invoice Infrastructure</title>
+<style>
+  :root { color-scheme: light dark; }
+  body { font-family: system-ui, sans-serif; max-width: 880px; margin: 0 auto; padding: 1.5rem; line-height: 1.5; }
+  h1 { font-size: 1.5rem; } h2 { font-size: 1.15rem; margin-top: 2rem; border-bottom: 1px solid #8884; padding-bottom: .3rem; }
+  button { padding: .5rem 1rem; cursor: pointer; }
+  button:disabled { opacity: .5; cursor: not-allowed; }
+  table { border-collapse: collapse; margin: .5rem 0; } td, th { border: 1px solid #8884; padding: .35rem .7rem; text-align: left; }
+  code, pre { background: #8881; padding: .1rem .3rem; border-radius: 4px; }
+  pre { overflow-x: auto; padding: .75rem; }
+  .status { font-weight: 600; }
+  .ok { color: #1a7f37; } .err { color: #c0392b; }
+  select, textarea { width: 100%; }
+  textarea { min-height: 180px; font-family: ui-monospace, monospace; font-size: .8rem; }
+  .muted { opacity: .7; font-size: .9rem; }
+</style>
+</head>
+<body>
+<h1>ProofInvoice</h1>
+<p>Verify business invoice claims from authenticated email using <strong>vlayer Email Proofs</strong>.</p>
+<p class="muted">The email itself never goes on-chain. Only a compact, cryptographically proven
+claim (invoice&nbsp;ID hash, issuer domain hash, amount, currency, due date) is recorded.</p>
+
+<h2>1. Invoice</h2>
+<section>
+  <label for="fixture">Sample invoice email</label>
+  <select id="fixture"><option value="">loading…</option></select>
+  <p class="muted">…or paste/upload your own <code>.eml</code>:</p>
+  <input type="file" id="file" accept=".eml,text/plain" />
+  <textarea id="eml" placeholder="Paste the raw .eml source here"></textarea>
+  <button id="parse">Parse claims</button>
+  <div id="parsed"></div>
+</section>
+
+<h2>2. Generate Proof</h2>
+<section>
+  <p class="muted">Runs <code>preverifyEmail</code> (DKIM record + DNS notary signature) and then
+  <code>vlayer.prove</code> against <code>ProofInvoiceProver.main</code>. Requires
+  <code>PROOFINVOICE_MODE=live</code> and a reachable vlayer prover.</p>
+  <label for="prover">Prover contract address</label>
+  <input id="prover" placeholder="0x… (ProofInvoiceProver)" style="width:100%" />
+  <button id="prove" disabled>Generate vlayer Proof</button>
+  <p>Status: <span id="proofState" class="status">idle</span></p>
+  <pre id="proofOut" hidden></pre>
+</section>
+
+<h2>3. Verify On Chain</h2>
+<section>
+  <button id="verify" disabled>Verify On Chain</button>
+  <p>Status: <span id="verifyState" class="status">idle</span></p>
+  <pre id="verifyOut" hidden></pre>
+</section>
+
+<h2>Result</h2>
+<section>
+  <h3>Verified Invoice Claim</h3>
+  <table id="result"><tbody></tbody></table>
+  <p><strong>Private data not stored on-chain.</strong> The full email, the DKIM DNS record and the
+  notary signature remain private prover inputs. Only the five claim fields above (with invoice ID
+  and issuer domain stored as hashes) are written to the chain.</p>
+</section>
+
+<h2>Metrics</h2>
+<section>
+  <p class="muted">Application-generated counters (never fabricated). <a id="metricsLink" href="/api/metrics"><code>/api/metrics</code></a></p>
+  <pre id="metricsOut"></pre>
+  <button id="refreshMetrics">Refresh metrics</button>
+</section>
+
+<script type="module" src="app.js"></script>
+</body>
+</html>

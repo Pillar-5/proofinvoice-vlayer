@@ -27,7 +27,10 @@ no_match_path = "test/ZZZ-never-matches-anything/*"
 
 [rpc_endpoints]
 anvil = "http://127.0.0.1:8545"
-sepolia = "https://eth-sepolia.public.blastapi.io"
+# Public, keyless community endpoints. Override with `--rpc-url` (or set
+# JSON_RPC_URL in .env and use it in application code) for anything beyond
+# evaluation: public endpoints are rate-limited and not suitable for load.
+sepolia = "https://ethereum-sepolia-rpc.publicnode.com"
 base-sepolia = "https://sepolia.base.org"
 optimism-sepolia = "https://sepolia.optimism.io"
 arbitrum-sepolia = "https://sepolia-rollup.arbitrum.io/rpc"

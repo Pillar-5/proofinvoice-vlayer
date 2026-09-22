@@ -8,6 +8,7 @@ import {
   parseDueDateDays,
   previewHashes,
   senderDomain,
+  SUPPORTED_CURRENCIES,
   type InvoiceClaimPreview,
 } from "../src/email/claims.js";
 import { keccak256, toBytes } from "viem";
@@ -120,8 +121,15 @@ describe("parseAmountMinor", () => {
     expect(parseAmountMinor("5", "GBP")).toBe(500n);
   });
 
-  it("handles zero-decimal currencies", () => {
-    expect(parseAmountMinor("1250", "JPY")).toBe(1250n);
+  it("rejects currencies outside the cross-layer allow-list", () => {
+    // JPY (0 decimals) and BHD (3 decimals) are deliberately unsupported: both
+    // sides convert to minor units by appending exactly two fraction digits, so
+    // a zero/three-decimal currency would disagree between preview and prover.
+    // They are also absent from InvoiceClaimLib.isSupportedCurrency.
+    expect(parseAmountMinor("1250", "JPY")).toBeNull();
+    expect(parseAmountMinor("1250", "KRW")).toBeNull();
+    expect(parseAmountMinor("1250", "BHD")).toBeNull();
+    expect(parseAmountMinor("1250", "XYZ")).toBeNull();
   });
 
   it("rejects invalid amounts", () => {
@@ -141,6 +149,47 @@ describe("parseDueDateDays", () => {
   it("rejects malformed dates", () => {
     expect(parseDueDateDays("20/02/2026")).toBeNull();
     expect(parseDueDateDays("2026-00-10")).toBeNull();
+  });
+});
+
+describe("cross-layer currency allow-list parity", () => {
+  /**
+   * The TypeScript preview and the Solidity prover/verifier must accept exactly
+   * the same set of currencies. If they drift, the UI would happily preview a
+   * claim that the prover can never produce — or worse, hash an amount the
+   * verifier rejects. This test parses the authoritative Solidity allow-list out
+   * of the source file, so any drift fails CI instead of reaching a user.
+   */
+  it("matches InvoiceClaimLib.isSupportedCurrency exactly", () => {
+    const solidityPath = resolve(
+      here,
+      "..",
+      "contracts",
+      "src",
+      "libraries",
+      "InvoiceClaim.sol",
+    );
+    const soliditySource = readFileSync(solidityPath, "utf8");
+
+    const isSupportedBody = /function isSupportedCurrency[\s\S]*?\n {4}\}/.exec(soliditySource);
+    expect(isSupportedBody).not.toBeNull();
+
+    const solidityCurrencies = [
+      ...(isSupportedBody as RegExpExecArray)[0].matchAll(/bytes3\("([A-Z]{3})"\)/g),
+    ]
+      .map((match) => match[1])
+      .sort();
+
+    const tsCurrencies = Object.keys(SUPPORTED_CURRENCIES).sort();
+
+    expect(solidityCurrencies.length).toBeGreaterThan(0);
+    expect(tsCurrencies).toEqual(solidityCurrencies);
+  });
+
+  it("declares every supported currency as two-decimal", () => {
+    for (const [code, decimals] of Object.entries(SUPPORTED_CURRENCIES)) {
+      expect(decimals, `${code} must be a two-decimal currency`).toBe(2);
+    }
   });
 });
 

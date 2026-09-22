@@ -28,7 +28,7 @@ function makeChains(): Record<ChainName, Chain> {
       id: 11_155_111,
       name: "sepolia",
       nativeCurrency: { name: "Ether", symbol: "ETH", decimals: 18 },
-      rpcUrls: { default: { http: ["https://eth-sepolia.public.blastapi.io"] } },
+      rpcUrls: { default: { http: ["https://ethereum-sepolia-rpc.publicnode.com"] } },
       blockExplorers: { default: { name: "Etherscan", url: "https://sepolia.etherscan.io" } },
     }),
     "base-sepolia": defineChain({
@@ -74,6 +74,12 @@ export function resolveChainName(value: string): ChainName {
 /** The viem chain definition for a settlement target. */
 export function createChain(name: ChainName): Chain {
   return CHAINS[name];
+}
+
+/** Default block explorer URL, when the chain defines one. */
+export function explorerOf(name: ChainName): { url: string; name: string } | null {
+  const explorer = CHAINS[name].blockExplorers?.default;
+  return explorer ? { url: explorer.url, name: explorer.name } : null;
 }
 
 /** The EIP-155 chain id for a settlement target. */

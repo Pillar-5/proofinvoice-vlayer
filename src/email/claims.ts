@@ -25,8 +25,25 @@ export interface ParsedEmail {
   headerBlock: string | null;
 }
 
-const CURRENCY_MINOR_UNITS: Record<string, number> = {
-  USD: 2, EUR: 2, GBP: 2, CHF: 2, JPY: 0, KRW: 0, BHD: 3, KWD: 3, TND: 3,
+/**
+ * Supported currencies. This list MUST stay identical to the allow-list in
+ * `contracts/src/libraries/InvoiceClaim.sol` (`InvoiceClaimLib.isSupportedCurrency`),
+ * and every entry must be a two-decimal ISO-4217 currency: the amount parsers on
+ * both sides convert to minor units by appending exactly two fraction digits
+ * (`"19"` -> 1900, `"7.5"` -> 750). Zero-decimal (JPY) or three-decimal (BHD)
+ * currencies would silently disagree between client and prover and are therefore
+ * excluded on purpose.
+ */
+export const SUPPORTED_CURRENCIES: Readonly<Record<string, number>> = {
+  EUR: 2,
+  USD: 2,
+  GBP: 2,
+  CHF: 2,
+  SEK: 2,
+  NOK: 2,
+  DKK: 2,
+  PLN: 2,
+  CZK: 2,
 };
 
 function headerValue(block: string, name: string): string | null {
@@ -46,13 +63,23 @@ export function senderDomain(fromValue: string): string | null {
 
 /** Converts "1250.00" + "EUR" into minor units, mirroring InvoiceClaimLib. */
 export function parseAmountMinor(amount: string, currency: string): bigint | null {
-  const decimals = CURRENCY_MINOR_UNITS[currency];
+  const decimals = SUPPORTED_CURRENCIES[currency];
   if (decimals === undefined) return null;
   const match = /^([0-9]{1,16})(?:\.([0-9]{1,2}))?$/.exec(amount.trim());
   if (!match || match[1] === undefined) return null;
   const whole = match[1];
   const frac = (match[2] ?? "").padEnd(decimals, "0").slice(0, decimals);
   return BigInt(whole + frac);
+}
+
+/** Days in a calendar month, mirroring InvoiceClaimLib._daysInMonth. */
+function daysInMonth(year: number, month: number): number {
+  if (month === 2) {
+    const leap = (year % 4 === 0 && year % 100 !== 0) || year % 400 === 0;
+    return leap ? 29 : 28;
+  }
+  if (month === 4 || month === 6 || month === 9 || month === 11) return 30;
+  return 31;
 }
 
 /** "2026-05-20" -> days since epoch (Howard Hinnant's days_from_civil). */
@@ -62,7 +89,10 @@ export function parseDueDateDays(date: string): bigint | null {
   const y = Number(match[1]);
   const m = Number(match[2]);
   const d = Number(match[3]);
-  if (m < 1 || m > 12 || d < 1 || d > 31) return null;
+  // Range and calendar validity mirror InvoiceClaimLib.parseDueDateDays exactly,
+  // so the preview and the prover accept the same set of dates.
+  if (y < 1970 || y > 2200) return null;
+  if (m < 1 || m > 12 || d < 1 || d > daysInMonth(y, m)) return null;
   const yy = m <= 2 ? y - 1 : y;
   const era = Math.floor(yy / 400);
   const yoe = yy - era * 400;

@@ -27,12 +27,20 @@ contract ProofInvoiceProver is Prover {
     using EmailProofLib for UnverifiedEmail;
 
     /// @dev `VerifiedEmail.from` is a bare mailbox (no display name), per vlayer docs.
-    ///      Capture group 1 is the domain; group 2 is the full result sanity anchor.
+    ///      Capture group 1 is the local part, group 2 the domain (group 0 is the whole match).
     string private constant FROM_RE = "^([A-Za-z0-9!#$%&'*+/=?^_`{|}~.-]{1,64})@([A-Za-z0-9.-]+\\.[A-Za-z]{2,})$";
 
     /// @dev Canonical `ProofInvoice/1` body header lines. Matching is case-insensitive
     ///      and anchored to the start of a line with `(?im)`, which the vlayer regex
-    ///      precompile (Rust `regex` crate) supports.
+    ///      precompile (Rust `regex` crate) supports. The captures are intentionally
+    ///      strict and must agree with the TypeScript extractor in `src/email/claims.ts`:
+    ///        * Amount: 1-16 integer digits plus optional 1-2 fraction digits - the
+    ///          claim parser rejects more than two fraction digits, so rejecting the
+    ///          match here yields a clearer "field missing" error;
+    ///        * Currency: exactly 3 ASCII letters, upper-cased by `main` before the
+    ///          allow-list check (a lowercase `currency: eur` line is still valid);
+    ///        * Due-Date: strict `YYYY-MM-DD` shape; calendar validity is checked by
+    ///          `InvoiceClaimLib.parseDueDateDays`.
     string private constant INVOICE_ID_RE = "(?im)^invoice-id:[ \\t]*([A-Za-z0-9._/-]{3,64})";
     string private constant AMOUNT_RE = "(?im)^amount:[ \\t]*([0-9]{1,16}(?:\\.[0-9]{1,2})?)";
     string private constant CURRENCY_RE = "(?im)^currency:[ \\t]*([A-Za-z]{3})";
@@ -81,11 +89,13 @@ contract ProofInvoiceProver is Prover {
         string memory dueDate = _requireCapture(email.body, DUE_DATE_RE, "Due-Date");
 
         // 4. Normalise and validate before anything becomes a public input.
+        //    The currency is upper-cased so a lowercase `currency: eur` line in the
+        //    email produces the same bytes3 as `EUR` (the TS extractor does the same).
         InvoiceClaim memory claim = InvoiceClaimLib.build(
             invoiceId,
             issuerDomain,
             InvoiceClaimLib.parseAmountMinor(amount),
-            _toBytes3(currencyCode),
+            _toBytes3(InvoiceClaimLib.toUpper(currencyCode)),
             InvoiceClaimLib.parseDueDateDays(dueDate)
         );
 
@@ -107,10 +117,16 @@ contract ProofInvoiceProver is Prover {
         return captures[1];
     }
 
-    /// @dev Converts a 3-character ASCII currency code into `bytes3`.
+    /// @dev Converts a 3-character ASCII currency code into `bytes3`. The caller
+    ///      passes the result of `InvoiceClaimLib.toUpper`, so the input is already
+    ///      upper-case; the explicit A-Z check guarantees the bytes3 only ever
+    ///      contains ASCII letters (never bytes that could collide with another claim).
     function _toBytes3(string memory code) private pure returns (bytes3) {
         bytes memory raw = bytes(code);
         require(raw.length == 3, "ProofInvoice: currency must be 3 letters");
+        for (uint256 i = 0; i < 3; ++i) {
+            require(raw[i] >= 0x41 && raw[i] <= 0x5A, "ProofInvoice: currency must be A-Z");
+        }
         return bytes3(raw[0]) | (bytes3(raw[1]) >> 8) | (bytes3(raw[2]) >> 16);
     }
 }

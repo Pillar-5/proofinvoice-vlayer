@@ -1,6 +1,13 @@
 const $ = (id) => document.getElementById(id);
 const state = { claim: null, proof: null, sessionId: null };
 
+/** Escapes email-derived strings before they are placed into innerHTML. */
+function esc(value) {
+  return String(value).replace(/[&<>"']/g, (ch) => (
+    { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[ch] ?? ch
+  ));
+}
+
 async function loadFixtures() {
   const res = await fetch("/api/fixtures");
   const { fixtures } = await res.json();
@@ -29,16 +36,19 @@ $("parse").addEventListener("click", async () => {
   const data = await res.json();
   const el = $("parsed");
   if (!data.claim) {
-    el.innerHTML = `<p class="err">No extractable claim: ${data.diagnostics?.join("; ") ?? "unknown"}</p>`;
+    el.innerHTML = `<p class="err">No extractable claim: ${esc(data.diagnostics?.join("; ") ?? "unknown")}</p>`;
     state.claim = null; $("prove").disabled = true;
     return;
   }
   const c = data.claim;
+  const minor = BigInt(c.amountMinor);
+  const units = minor / 100n;
+  const fraction = (minor % 100n).toString().padStart(2, "0");
   el.innerHTML = `<table><tbody>
-    <tr><th>Invoice ID</th><td>${c.invoiceId} <code>${c.invoiceIdHash.slice(0, 10)}…</code></td></tr>
-    <tr><th>Issuer domain</th><td>${c.issuerDomain} <code>${c.issuerDomainHash.slice(0, 10)}…</code></td></tr>
-    <tr><th>Amount</th><td>${Number(c.amountMinor) / 100} ${c.currency} (minor: ${c.amountMinor})</td></tr>
-    <tr><th>Due date</th><td>epoch day ${c.dueDateDays}</td></tr>
+    <tr><th>Invoice ID</th><td>${esc(c.invoiceId)} <code>${esc(c.invoiceIdHash.slice(0, 10))}…</code></td></tr>
+    <tr><th>Issuer domain</th><td>${esc(c.issuerDomain)} <code>${esc(c.issuerDomainHash.slice(0, 10))}…</code></td></tr>
+    <tr><th>Amount</th><td>${units.toString()}.${fraction} ${esc(c.currency)} (minor: ${esc(c.amountMinor)})</td></tr>
+    <tr><th>Due date</th><td>epoch day ${esc(c.dueDateDays)}</td></tr>
   </tbody></table>`;
   state.claim = c;
   $("prove").disabled = false;
@@ -119,16 +129,22 @@ async function loadConfig() {
     ["Contracts", chainConfig.verifierAddress && chainConfig.registryAddress && chainConfig.proverAddress ? "Configured" : "Not configured"],
   ];
   $("statusPanel").querySelector("tbody").innerHTML =
-    rows.map(([k, v]) => `<tr><th>${k}</th><td>${v}</td></tr>`).join("");
+    rows.map(([k, v]) => `<tr><th>${esc(k)}</th><td>${esc(v)}</td></tr>`).join("");
 }
 
 function renderResult(session) {
   const p = session.proof?.proof ?? {};
+  const c = state.claim;
+  let amountDisplay = p.amountMinor ?? "—";
+  if (c) {
+    const minor = BigInt(c.amountMinor);
+    amountDisplay = `${(minor / 100n).toString()}.${(minor % 100n).toString().padStart(2, "0")} ${c.currency}`;
+  }
   const rows = [
-    ["Invoice ID", state.claim?.invoiceId],
-    ["Issuer domain", state.claim?.issuerDomain],
-    ["Amount", state.claim ? `${Number(state.claim.amountMinor) / 100} ${state.claim.currency}` : p.amountMinor],
-    ["Verification timestamp", new Date(Number(session.settlement?.verifiedAt ?? 0) * 1000).toISOString()],
+    ["Invoice ID", c?.invoiceId],
+    ["Issuer domain", c?.issuerDomain],
+    ["Amount", amountDisplay],
+    ["Verification timestamp", session.settlement?.verifiedAt ? new Date(Number(session.settlement.verifiedAt) * 1000).toISOString() : null],
     ["Transaction", session.settlement?.txHash],
     ["Claim hash", session.settlement?.claimHash],
     ["Contract (Registry)", chainConfig?.registryAddress],
@@ -136,7 +152,22 @@ function renderResult(session) {
     ["Block", session.settlement?.blockNumber],
   ];
   $("result").querySelector("tbody").innerHTML =
-    rows.map(([k, v]) => `<tr><th>${k}</th><td><code>${v ?? "—"}</code></td></tr>`).join("");
+    rows.map(([k, v]) => `<tr><th>${esc(k)}</th><td><code>${esc(v ?? "—")}</code></td></tr>`).join("");
+  if (session.settlement?.txHash && chainConfig?.explorerUrl) {
+    const tr = document.createElement("tr");
+    const th = document.createElement("th");
+    th.textContent = "Explorer";
+    const td = document.createElement("td");
+    const txLink = document.createElement("a");
+    txLink.href = `${chainConfig.explorerUrl}/tx/${session.settlement.txHash}`;
+    txLink.textContent = `View on ${chainConfig.explorerName ?? "block explorer"}`;
+    txLink.target = "_blank";
+    txLink.rel = "noopener noreferrer";
+    td.appendChild(txLink);
+    tr.appendChild(th);
+    tr.appendChild(td);
+    $("result").querySelector("tbody").appendChild(tr);
+  }
 }
 
 loadConfig();

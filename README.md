@@ -1,4 +1,6 @@
-﻿ProofInvoice converts authenticated business email information into privacy-preserving, verifiable invoice claims that can be consumed by EVM smart contracts.
+# ProofInvoice
+
+ProofInvoice converts authenticated business email into privacy-preserving, verifiable invoice claims that can be consumed by EVM smart contracts.
 
 ## Overview
 
@@ -33,7 +35,7 @@ ProofInvoice bridges that gap: it verifies the cryptographic properties of authe
 - **Authenticated email verification** — DKIM signature checked against the sender domain's DNS record inside the vlayer zkEVM
 - **Issuer-domain binding** — the claim's issuer domain comes from the authenticated `From` header, never from the body
 - **Structured claim extraction** — invoice ID, amount, currency, due date extracted by regex from authenticated content only
-- **Privacy-preserving proof generation** — only the extracted claim is published; the full email never leaves the proving step
+- **Privacy-preserving claim publication** — the raw email is never published; only the derived claim (hashes and scalars) is written on-chain
 - **Cryptographic on-chain verification** — `InvoiceVerifier` validates the proof seal, prover identity, and claim digest via `onlyVerified`
 - **Replay protection** — the registry rejects duplicate claim hashes and invoice IDs
 - **Deterministic claim schema** — hashes and minor-unit scalars, identical off-chain and in the prover
@@ -41,7 +43,7 @@ ProofInvoice bridges that gap: it verifies the cryptographic properties of authe
 
 ## Privacy
 
-**Private (never on-chain):** the raw `.eml`, headers, subject, body, recipient address, and any personal information. The email exists only as private prover input.
+**Private (never on-chain):** the raw `.eml`, headers, subject, body, recipient address, and any personal information. The email is submitted as *private input* to a vlayer prover — your own local devnet, or a hosted prover you configure — and is never written to the blockchain, returned by the API, or persisted by ProofInvoice. See the [privacy boundary](docs/security-and-trust.md#privacy-boundary) for exactly what the prover sees.
 
 **Public (on-chain, by design):**
 
@@ -54,7 +56,7 @@ ProofInvoice bridges that gap: it verifies the cryptographic properties of authe
 | Due date | `uint64` days since Unix epoch |
 | Claim identity | `keccak256` of the packed claim |
 
-See [docs/security-and-trust.md](docs/security-and-trust.md) for the full trust model.
+Because the invoice ID and issuer domain are hashed rather than encrypted, the on-chain record does not reveal them unless you already know the candidate value — a low-entropy invoice ID can be confirmed by anyone who guesses it. See [docs/security-and-trust.md](docs/security-and-trust.md) for the full trust model.
 
 ## Architecture
 

@@ -8,7 +8,7 @@ import { metrics } from "../metrics/metrics.js";
 import { parseInvoiceEmail, previewHashes, type ParsedEmail, type InvoiceClaimPreview } from "../email/claims.js";
 import { generateEmailProof, type EmailProofResult, type VlayerConfig } from "../vlayer/client.js";
 import { settleProofOnChain, type ChainConfig, type SettlementResult } from "../vlayer/settle.js";
-import { createChain, resolveChainName } from "../vlayer/chains.js";
+import { createChain, explorerOf, resolveChainName } from "../vlayer/chains.js";
 import { privateKeyToAccount } from "viem/accounts";
 
 /**
@@ -242,6 +242,7 @@ export function createApp(config: AppConfig): Express {
   // Every value comes from the validated config so the UI can never display a
   // network/address that differs from the one the server actually settles on.
   app.get("/api/config", (_req: Request, res: Response) => {
+    const explorer = explorerOf(config.vlayer.chainName);
     res.json({
       mode: config.mode,
       network: config.vlayer.chainName,
@@ -251,6 +252,8 @@ export function createApp(config: AppConfig): Express {
       proverAddress: config.chain.proverAddress,
       verifierAddress: config.chain.verifierAddress,
       registryAddress: config.chain.registryAddress,
+      explorerName: explorer?.name ?? null,
+      explorerUrl: explorer?.url ?? null,
     });
   });
 

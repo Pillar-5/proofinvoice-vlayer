@@ -1,5 +1,5 @@
 /**
- * In-memory grant KPI instrumentation.
+ * In-memory application instrumentation (proof attempts, verifications, timings).
  *
  * Counters only — no personal information, no email content, no identifiers
  * beyond hashed issuer domains / invoice ids (which is also all the chain

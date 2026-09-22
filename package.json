@@ -2,7 +2,7 @@
   "name": "proofinvoice-vlayer",
   "version": "0.1.0",
   "private": true,
-  "description": "ProofInvoice: verifiable business invoice claims from authenticated email using vlayer Email Proofs",
+  "description": "Privacy-preserving invoice verification using vlayer Email Proofs and EVM smart contracts",
   "license": "MIT",
   "type": "module",
   "engines": {

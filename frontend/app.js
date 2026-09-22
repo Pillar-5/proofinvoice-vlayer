@@ -112,6 +112,14 @@ async function loadConfig() {
   $("chainInfo").textContent =
     `Network: ${chainConfig.network} (chainId ${chainConfig.chainId}) · mode: ${chainConfig.mode}` +
     ` · Verifier: ${chainConfig.verifierAddress ?? "not deployed"} · Registry: ${chainConfig.registryAddress ?? "not deployed"}`;
+  const rows = [
+    ["Mode", chainConfig.mode === "live" ? "Live (real proving enabled)" : "Local demonstration (parsing + workflow only)"],
+    ["vlayer", chainConfig.proverUrl ? `Configured (${chainConfig.proverUrl})` : "Not configured"],
+    ["Network", `${chainConfig.network} (chain id ${chainConfig.chainId})`],
+    ["Contracts", chainConfig.verifierAddress && chainConfig.registryAddress && chainConfig.proverAddress ? "Configured" : "Not configured"],
+  ];
+  $("statusPanel").querySelector("tbody").innerHTML =
+    rows.map(([k, v]) => `<tr><th>${k}</th><td>${v}</td></tr>`).join("");
 }
 
 function renderResult(session) {

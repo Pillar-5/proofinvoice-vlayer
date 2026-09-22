@@ -1,3 +1,4 @@
+import { config as loadDotenv } from "dotenv";
 import express, { type Express, type Request, type Response, type NextFunction } from "express";
 import { readFileSync, readdirSync, existsSync } from "node:fs";
 import { join, dirname, resolve } from "node:path";
@@ -19,6 +20,10 @@ import { privateKeyToAccount } from "viem/accounts";
 const here = dirname(fileURLToPath(import.meta.url));
 const repoRoot = resolve(here, "..", "..");
 const fixturesDir = join(repoRoot, "fixtures");
+
+// Load the git-ignored .env from the repository root. Values already present in
+// the environment take precedence (dotenv does not overwrite existing keys).
+loadDotenv({ path: join(repoRoot, ".env") });
 
 export interface ProofSession {
   id: number;

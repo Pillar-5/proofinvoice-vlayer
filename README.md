@@ -1,303 +1,198 @@
-# ProofInvoice: Verifiable Business Invoice Infrastructure
+﻿ProofInvoice converts authenticated business email information into privacy-preserving, verifiable invoice claims that can be consumed by EVM smart contracts.
 
-A vlayer Grants MVP. ProofInvoice converts **authenticated business email claims into
-privacy-preserving, cryptographically verifiable claims** that EVM smart contracts can consume —
-using real [vlayer Email Proofs](https://docs.vlayer.xyz/), not simulations.
+## Overview
 
-> A user can prove selected claims contained in an authenticated business email — invoice identity,
-> issuer domain, amount, currency, due date — and have those claims cryptographically verified and
-> consumed by an EVM smart contract, without putting the complete private email on-chain.
+ProofInvoice takes a DKIM-authenticated business invoice email, extracts a small structured claim (invoice ID, issuer domain, amount, currency, due date), turns it into a vlayer Email Proof, and registers the verified claim on-chain — without ever putting the email itself on-chain.
 
----
+Built on [vlayer Email Proofs](https://book.vlayer.xyz/features/email.html): the email's DKIM signature is verified inside a zkEVM prover, regexes extract the invoice fields from the authenticated content, and a succinct ZK proof lets the on-chain `InvoiceVerifier` accept the claim. Only hashed/derived claim values reach the blockchain.
 
-## What ProofInvoice is NOT
+## How it works
 
-This is explicitly **not**:
+```text
+Authenticated business email (.eml)
+        ↓
+DKIM verification (vlayer preverifyEmail + zkEVM)
+        ↓
+Invoice claim extraction (regex inside the prover)
+        ↓
+Cryptographic proof (vlayer prove / waitForProvingResult)
+        ↓
+On-chain verification (InvoiceVerifier.onlyVerified)
+        ↓
+Verified invoice claim (InvoiceRegistry + events)
+```
 
-- a generic email verifier
-- a centralized invoice database
-- a payment processor
-- a replacement for accounting software
-- a claim that any invoice is economically legitimate
+## Why ProofInvoice
 
-Its sole purpose is to provide a **privacy-preserving cryptographic bridge between authenticated
-business email claims and smart-contract workflows**.
+Business email contains structured, operationally useful information — invoices, approvals, orders — that normally stays locked inside private mailboxes. Smart contracts cannot consume it, and screenshot-based or self-reported integrations provide no cryptographic guarantee.
 
----
+ProofInvoice bridges that gap: it verifies the cryptographic properties of authenticated email (DKIM signature, sender domain, exact content) and exposes only the fields an application needs, as a compact on-chain claim. The email stays private; the claim becomes verifiable.
 
-## Problem
+## Key capabilities
 
-Invoice-backed workflows (financing, escrow, audit) need to know: *"did an invoice with these exact
-terms really come from this issuer's domain?"* Today that question is answered by centralized APIs
-that read private mailboxes, or by trust-me databases. Smart contracts cannot read email, and
-putting business email on-chain is unacceptable.
+- **Authenticated email verification** — DKIM signature checked against the sender domain's DNS record inside the vlayer zkEVM
+- **Issuer-domain binding** — the claim's issuer domain comes from the authenticated `From` header, never from the body
+- **Structured claim extraction** — invoice ID, amount, currency, due date extracted by regex from authenticated content only
+- **Privacy-preserving proof generation** — only the extracted claim is published; the full email never leaves the proving step
+- **Cryptographic on-chain verification** — `InvoiceVerifier` validates the proof seal, prover identity, and claim digest via `onlyVerified`
+- **Replay protection** — the registry rejects duplicate claim hashes and invoice IDs
+- **Deterministic claim schema** — hashes and minor-unit scalars, identical off-chain and in the prover
+- **Developer API + reproducible local development** — deterministic fixtures, offline test suite, local devnet option, and a hosted testnet path
 
-## Solution
+## Privacy
 
-vlayer Email Proofs close the gap:
+**Private (never on-chain):** the raw `.eml`, headers, subject, body, recipient address, and any personal information. The email exists only as private prover input.
 
-1. The email's DKIM signature is verified inside a zkEVM against the sender's live DNS record,
-   countersigned by a DNS notary — the email is cryptographically authenticated.
-2. A **Prover** contract extracts only the invoice claim fields from the authenticated content.
-3. Only those extracted fields become the **public journal**; the full email stays private.
-4. A RISC Zero proof binds the journal to the prover contract and function.
-5. An on-chain **Verifier** checks the seal and writes the claim into a **Registry**.
+**Public (on-chain, by design):**
 
-## Why vlayer
+| Field | Representation |
+|---|---|
+| Invoice ID | `keccak256` hash |
+| Issuer domain | `keccak256` hash |
+| Amount | `uint256` in ISO-4217 minor units |
+| Currency | `bytes3` (alpha-3 code) |
+| Due date | `uint64` days since Unix epoch |
+| Claim identity | `keccak256` of the packed claim |
 
-- Ordinary database attestations require trusting the operator. A zk proof requires trusting only
-  cryptography and DNS.
-- Centralized mailbox-reading APIs demand broad OAuth scopes on private inboxes. Here the raw email
-  never leaves the proving environment, and only five hashed/scalar fields become public.
-- DKIM authentication is already deployed on every serious business mail server — vlayer turns that
-  existing infrastructure into an on-chain trust anchor without new sender-side work.
+See [docs/security-and-trust.md](docs/security-and-trust.md) for the full trust model.
 
 ## Architecture
 
 ```mermaid
 flowchart LR
-    A[Business email .eml] --> B[preverifyEmail<br/>DKIM DNS record + notary signature]
-    B --> C[vlayer zkEVM Prover<br/>ProofInvoiceProver.main]
-    C --> D[RISC Zero proof + public journal<br/>claim fields only]
-    D --> E[InvoiceVerifier<br/>onlyVerified check on-chain]
-    E --> F[InvoiceRegistry<br/>hashes, replay protection]
-    F --> G[Verified invoice claim<br/>+ InvoiceVerified event]
+    A[Business email .eml] --> B[preverifyEmail - DKIM + DNS notary]
+    B --> C[ProofInvoiceProver - vlayer zkEVM]
+    C --> D[Email Proof + claim journal]
+    D --> E[InvoiceVerifier - onlyVerified]
+    E --> F[InvoiceRegistry]
+    F --> G[Verified invoice claim + events]
+    H[Express API] --> B
+    H --> E
+    I[Web UI] --> H
 ```
 
-## Privacy model
+Modules: `src/email` (parsing/claim extraction), `src/vlayer` (prover client, settlement, chains), `contracts/src` (Solidity), `src/server` (API), `frontend/` (UI), `src/metrics` (counters).
 
-| Value | On-chain? | Notes |
-|---|---|---|
-| Full email / MIME body | **never** | private prover input inside the zkEVM |
-| DKIM DNS record + notary signature | **never** | private prover input |
-| Invoice ID | hash only | `keccak256(upper(invoiceId))` |
-| Issuer domain | hash only | `keccak256(lower(domain))`, derived from the authenticated `From` header |
-| Amount (minor units) | **yes, public** | needed to be useful; contains no personal data |
-| Currency (ISO-4217) | **yes, public** | `bytes3` |
-| Due date | **yes, public** | days since epoch |
-| Submitter address | **yes, public** | who paid for the verification tx |
+## Invoice claim
 
-## Threat model — what the proof does and does not establish
-
-**Proved:**
-
-- the email was DKIM-authenticated for the stated sender domain (per the supported mechanism)
-- the claimed fields were present in that authenticated content
-- the proof is valid, bound to this prover contract and function, on this chain
-- the exact claim has not been consumed before (replay protection)
-
-**NOT proved — do not rely on this system for:**
-
-- that the supplier is economically legitimate
-- that the invoice represents a genuine commercial transaction
-- that the underlying goods/services were delivered
-- that the invoice amount is commercially correct
-- that the sender's mail account has not been compromised (DKIM proves the domain signed the mail,
-  not the intentions of whoever controls the account)
-- that the recipient legally owes the amount
-
-**Never collected:** email passwords, OAuth tokens, private keys (beyond the settlement key you
-configure yourself), seed phrases, authentication cookies.
-
----
-
-## vlayer integration
-
-Everything below uses the **official, current** vlayer stack (verified against
-[docs.vlayer.xyz](https://docs.vlayer.xyz/) and [vlayer-xyz/vlayer](https://github.com/vlayer-xyz)
-at implementation time):
-
-| Component | Used here |
-|---|---|
-| TypeScript SDK | `@vlayer/sdk` **1.5.1** (`createVlayerClient`, `preverifyEmail`) |
-| Solidity contracts | `vlayer.zip` release asset from `vlayer-xyz/vlayer` **v1.5.1** (`Prover`, `Verifier`, `EmailProofLib`, `RegexLib`, `Proof`) |
-| Prover pattern | `ProofInvoiceProver is Prover`, `main(UnverifiedEmail)` returns `Proof` + claim fields; private input stays private |
-| Verifier pattern | `InvoiceVerifier is Verifier`, `onlyVerified(prover, ProofInvoiceProver.main.selector)` re-derives the journal from the submitted arguments |
-| Devnet | docker compose `vdns_server` (:3002) + `call_server` (:3000), anvil at 31337 |
-| Env vars | `PROVER_URL`, `DNS_SERVICE_URL`, `VLAYER_API_TOKEN`, `VLAYER_ENV`, `CHAIN_NAME`, `JSON_RPC_URL` (the official names from `@vlayer/sdk/config`) |
-| Compiler | solc **0.8.28** (vlayer 1.5.1 pin), Foundry |
-
-Record of packages/versions: `@vlayer/sdk@1.5.1`, vlayer Solidity `v1.5.1`, forge-std `1.9.4`,
-OpenZeppelin `5.0.1`, risc0-ethereum `3.0.0` — all pinned with SHA-256 digests in
-`scripts/fetch-vlayer-contracts.mjs`.
-
-### Claim schema
-
-```solidity
-struct InvoiceClaim {
-    bytes32 invoiceIdHash;      // keccak256(upper(invoiceId))
-    bytes32 issuerDomainHash;   // keccak256(lower(domain from authenticated From))
-    uint256 amountMinor;        // ISO-4217 minor units
-    bytes3  currency;           // ISO-4217 alpha-3
-    uint64  dueDateDays;        // days since epoch (UTC)
+```text
+InvoiceClaim {
+    invoiceIdHash     bytes32   keccak256(upper-cased invoice ID)
+    issuerDomainHash  bytes32   keccak256(lower-cased DKIM-authenticated From domain)
+    amountMinor       uint256   ISO-4217 minor units
+    currency          bytes3    ISO-4217 alpha-3
+    dueDateDays       uint64    days since Unix epoch (UTC)
 }
 ```
 
-The prover extracts fields from the authenticated body using vlayer's regex precompile — the
-`Invoice-ID:`, `Amount:`, `Currency:`, `Due-Date:` header-style fields (matched anywhere in the
-message body; fixtures may wrap them in optional `BEGIN/END PROOFINVOICE CLAIM` markers), plus the
-domain from the authenticated `From` header. The TypeScript parser is a deliberate mirror of these
-exact regexes, so what you see in the UI is what the zkEVM prover will prove.
+The TypeScript parser (`src/email/claims.ts`) mirrors the Solidity prover regexes exactly, so what the UI shows is what the prover will extract and verify.
 
-Sample demo output and a UI screenshot: see [`docs/demo-output.md`](docs/demo-output.md) and
-[`docs/screenshot-demo.png`](docs/screenshot-demo.png) (regenerate with `npm run screenshot` while
-the server is running).
+## vlayer integration
+
+Version: **`@vlayer/sdk@1.5.1`** with the official **vlayer v1.5.1** Solidity contracts. See [docs/vlayer-version.md](docs/vlayer-version.md) for the version audit.
+
+| Component | Usage |
+|---|---|
+| `preverifyEmail` | DKIM/DNS-notary preverification of the `.eml` (`src/vlayer/client.ts`) |
+| `createVlayerClient` → `prove` → `waitForProvingResult` | real proof generation against the configured prover |
+| `Prover` / `EmailProofLib` / `RegexLib` | `contracts/src/vlayer/ProofInvoiceProver.sol` — DKIM verify + claim extraction in the zkEVM |
+| `Verifier` / `onlyVerified` | `contracts/src/vlayer/InvoiceVerifier.sol` — on-chain proof check and claim registration |
+| Official env vars | `PROVER_URL`, `DNS_SERVICE_URL`, `VLAYER_API_TOKEN`, `VLAYER_ENV`, `CHAIN_NAME`, `JSON_RPC_URL` |
+
+## Getting started
+
+```bash
+git clone https://github.com/Pillar-5/proofinvoice-vlayer.git
+cd proofinvoice-vlayer
+npm install
+npm run contracts:install   # pins official vlayer/forge-std/OpenZeppelin releases (sha256-verified)
+npm run contracts:build
+cp .env.example .env        # then edit .env
+npm run dev                 # http://localhost:3000
+```
+
+Without further configuration the app runs in **local demonstration** mode: it parses emails, extracts claims, and walks you through the full workflow, and states clearly that cryptographic verification requires the configured vlayer proving environment. Configure `.env` (see [docs/live-demo.md](docs/live-demo.md)) to run the real proof flow.
+
+## Local development
+
+```bash
+npm run contracts:install   # install pinned Solidity dependencies
+npm run contracts:build     # forge build (solc 0.8.28)
+npm run contracts:test      # forge test (39 tests)
+npm test                    # vitest unit suite (23 tests)
+npm run typecheck           # tsc --noEmit
+npm run build               # production build to dist/
+npm run test:integration    # live end-to-end test (skips without live config)
+```
+
+Optional full local devnet (Docker): `cd contracts && docker compose up -d`, then set `PROVER_URL=http://127.0.0.1:3000`, `DNS_SERVICE_URL=http://127.0.0.1:3002`, `CHAIN_NAME=anvil`.
+
+## Testnet deployment
+
+```bash
+cd contracts
+PRIVATE_KEY=<test wallet key> forge script script/Deploy.s.sol \
+  --rpc-url $JSON_RPC_URL --broadcast
+```
+
+The script deploys `ProofInvoiceProver`, `InvoiceRegistry`, and `InvoiceVerifier`, wires the registry to the verifier, prints all addresses, and records the run in `contracts/broadcast/` (git-ignored). Copy the printed addresses into `.env`. Details and the complete live flow: [docs/live-demo.md](docs/live-demo.md).
+
+## Live proof demonstration
+
+See [docs/live-demo.md](docs/live-demo.md) — preparing a DKIM-signed test email, configuring the hosted testnet prover, running the full `email → proof → on-chain claim` flow, and inspecting the result on a block explorer.
+
+## API
+
+| Endpoint | Description |
+|---|---|
+| `GET /api/config` | runtime configuration and component status |
+| `GET /api/fixtures` | list deterministic sample emails |
+| `GET /api/fixtures/:name` | fetch a sample `.eml` |
+| `POST /api/parse` | parse an uploaded `.eml` and extract the invoice claim |
+| `POST /api/proof` | generate a real vlayer Email Proof (requires live config) |
+| `GET /api/proof/:id` | poll proving status/result |
+| `POST /api/verify/:id` | submit the proof to `InvoiceVerifier` and register the claim |
+| `GET /api/metrics` | application counters (proofs, verifications, timings) |
 
 ## Contracts
 
 | Contract | Role |
 |---|---|
-| `ProofInvoiceProver` | vlayer Prover; verifies DKIM, extracts claim, emits journal |
-| `InvoiceVerifier` | verifies the RISC Zero seal via vlayer `Verifier`, re-validates claim, forwards to registry |
-| `InvoiceRegistry` | stores records (hashes + scalars), one-shot verifier wiring, replay + duplicate-invoice protection, optional issuer allow-list, audit events |
+| `ProofInvoiceProver` | vlayer `Prover`; DKIM-verifies the email in the zkEVM and extracts the invoice claim from authenticated content |
+| `InvoiceVerifier` | vlayer `Verifier`; validates the proof via `onlyVerified`, re-validates the claim, forwards to the registry |
+| `InvoiceRegistry` | stores verified claims (hashes/scalars only), replay protection, `InvoiceVerified` events, single-verifier access control |
 
-Deployed addresses: none published yet. This README will only ever list real addresses after an
-actual deployment — none are invented here.
+## Security
 
-## Project layout
+See [docs/security-and-trust.md](docs/security-and-trust.md) for what the system proves, what it deliberately does not, and its trust assumptions.
 
-```
-contracts/          Foundry project (src, test, script)
-src/                TypeScript app
-  email/            .eml parsing + claim extraction (client-side mirror of the prover)
-  vlayer/           @vlayer/sdk client, ABIs, settlement, chains
-  server/           express API + static frontend
-  metrics/          grant KPI counters
-  config.ts         strict env loading (fail-fast, demo/live modes)
-frontend/           minimal demo UI
-fixtures/           deterministic .eml demo emails
-tests/              vitest unit tests (+ tests/integration for live E2E)
-scripts/            dependency installer, metrics exporter
-```
+## Deployments
 
----
+### Ethereum Sepolia (chain ID 11155111)
 
-## Installation
-
-Prerequisites: Node ≥ 20, [Foundry](https://book.getfoundry.sh/)
-(`curl -L https://foundry.paradigm.xyz | bash && foundryup`), Docker (devnet only).
-
-```bash
-git clone https://github.com/Pillar-5/proofinvoice-vlayer.git
-cd proofinvoice-vlayer
-npm install                 # app dependencies
-npm run contracts:install   # pinned vlayer/foundry deps (sha256-verified)
-npm run contracts:build     # forge build (solc 0.8.28)
-```
-
-## Configuration
-
-```bash
-cp .env.example .env
-```
-
-| Variable | Meaning |
+| Contract | Address |
 |---|---|
-| `PROOFINVOICE_MODE` | `demo` (default): parser/UI/metrics only; proof endpoints fail with HTTP 409 instead of faking. `live`: real proving + settlement. |
-| `PROVER_URL` | vlayer prover API (devnet `call_server`: `http://127.0.0.1:3000`) |
-| `DNS_SERVICE_URL` | DKIM DNS resolver (devnet `vdns_server`: `http://127.0.0.1:3002`, hosted: `https://test-dns.vlayer.xyz`) |
-| `VLAYER_API_TOKEN` | only for hosted proving |
-| `VLAYER_ENV` | `dev` / `testnet` / `mainnet` (official vlayer environment selector) |
-| `CHAIN_NAME` | `anvil` (devnet) or sepolia / base-sepolia / optimism-sepolia / arbitrum-sepolia. Single source of truth — the chain id sent with the proving request is derived from it, so RPC and prover can never disagree |
-| `JSON_RPC_URL` | settlement RPC |
-| `PROVER_ADDRESS` / `VERIFIER_ADDRESS` / `REGISTRY_ADDRESS` | deployed contracts |
-| `PRIVATE_KEY` | settlement tx signer (anvil default key for devnet) |
-| `PORT` | HTTP port (default 3000) |
+| ProofInvoiceProver | [`0xBebf4c83daC02579024f273972aEd796d0086aA1`](https://sepolia.etherscan.io/address/0xBebf4c83daC02579024f273972aEd796d0086aA1) |
+| InvoiceRegistry | [`0x7663c39DC4f0a8f3c255B2Da4fa465be0a426514`](https://sepolia.etherscan.io/address/0x7663c39DC4f0a8f3c255B2Da4fa465be0a426514) |
+| InvoiceVerifier | [`0x0Eef53E811E5e1Cf3E4B61e60Bb539d4d29a10E4`](https://sepolia.etherscan.io/address/0x0Eef53E811E5e1Cf3E4B61e60Bb539d4d29a10E4) |
 
-Never commit `.env`. The repository contains `.env.example` only.
+Deployment transactions: [Prover](https://sepolia.etherscan.io/tx/0xbc1644f3d99513c7ef398b467a6dd2162afc46adf8cda58afe1b7ca7af2415b4), [Registry](https://sepolia.etherscan.io/tx/0x27fc1cbb3daa4037076e65189f5323359308c5725f257ae57d84780d44617da9), [Verifier](https://sepolia.etherscan.io/tx/0x45a663729546a014d9c7d8f7ddcc2495eb3c3c3c0587f56a5af3416602ef34a5), [registry→verifier wiring](https://sepolia.etherscan.io/tx/0xe577c26cd80a5ee39574e24a9414914c40380b4f2de66de05bba33b30d97f5f2).
 
-## Local development
+## Repository structure
 
-```bash
-npm run dev          # tsx src/server/main.ts -> http://localhost:3000
-npm run typecheck    # strict tsc
-npm run build        # tsc -> dist/
-npm start            # node dist/src/server/main.js
+```text
+contracts/          Foundry project (Prover, Verifier, Registry, tests, deploy script)
+src/email/          .eml parsing and invoice claim extraction
+src/vlayer/         vlayer client, prover ABI, settlement, chain table
+src/server/         Express API
+src/metrics/        application counters
+frontend/           single-page UI
+fixtures/           deterministic sample .eml files (development only, not proofs)
+docs/               security-and-trust.md, live-demo.md, vlayer-version.md, demo artifacts
+tests/              vitest unit + integration suites
 ```
-
-## Test
-
-```bash
-npm test                     # app unit tests (no external services)
-npm run contracts:test       # forge test: 39 Solidity tests
-npm run contracts:fmt        # forge fmt --check
-npm run test:integration     # LIVE end-to-end; skips unless the full vlayer env is configured
-```
-
-## Deployment
-
-Local devnet:
-
-```bash
-docker compose -f contracts/compose.yaml up -d   # vlayer devnet (call_server, vdns_server)
-anvil                                            # terminal 1
-cd contracts && forge script Deploy --rpc-url anvil --broadcast
-```
-
-Then set `PROVER_ADDRESS`, `VERIFIER_ADDRESS`, `REGISTRY_ADDRESS` in `.env` and run with
-`PROOFINVOICE_MODE=live`.
-
-Testnet (requires a funded key + RPC in `contracts/foundry.toml`):
-
-```bash
-cd contracts && forge script Deploy --rpc-url sepolia --broadcast --verify
-```
-
-## Demo
-
-Reproducible demo without any external account:
-
-```bash
-npm install && npm run contracts:install && npm run contracts:build
-npm run dev
-# open http://localhost:3000
-#   1. pick fixtures/invoice-sample.eml  ->  "Parse claims"
-#   2. live counters at /api/metrics
-```
-
-In demo mode the UI shows parsing and metrics; pressing *Generate vlayer Proof* fails **loudly**
-(HTTP 409) explaining exactly what is missing — it never pretends to prove. The complete live demo
-(devnet → real proof → on-chain verification) is documented under Deployment and exercised by
-`npm run test:integration`.
-
-## Metrics
-
-`GET /api/metrics` (and `npm run metrics:export`) report application-generated counters:
-
-```json
-{
-  "proof_attempts": 0,
-  "proofs_generated": 0,
-  "proofs_failed": 0,
-  "onchain_verifications": 0,
-  "invoices_verified": 0,
-  "issuer_domains": 0,
-  "avg_proof_ms": null
-}
-```
-
-Values are never fabricated; they reset on process restart. No personal information is collected.
-
-## Proposed post-MVP KPIs (targets, not achievements)
-
-*Initial prototype:* 1 working Email Proof flow · 1 deployed Verifier · 1 deployed Registry · 1
-end-to-end demonstration.
-
-*First grant-funded phase (targets, revisable):* 100 verified invoice proofs · 50 verified invoice
-records · 10 test organizations/domains · 100 on-chain verification events.
-
----
-
-## Grant relevance
-
-ProofInvoice is a candidate for the vlayer Grants programme because it demonstrates a
-non-social, high-value use of Email Proofs: **business documents that already carry DKIM
-signatures become machine-verifiable on-chain claims**. It exercises the full stack — email
-preverification, regex extraction in the zkEVM, private inputs with a minimal public journal,
-on-chain `onlyVerified` consumption, and replay-protected registry state — and ships reproducible
-tests and metrics for both. The grant has **not** been approved; this repository is the application
-MVP.
 
 ## License
 
-MIT
+MIT — see [LICENSE](LICENSE).
+
